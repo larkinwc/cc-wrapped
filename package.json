@@ -6,13 +6,13 @@
     "email": "numman.ali@gmail.com"
   },
   "description": "Generate a personalized Spotify Wrapped-style summary of your Claude Code usage",
-  "homepage": "https://github.com/numman-ali/cc-wrapped",
+  "homepage": "https://github.com/larkinwc/cc-wrapped",
   "repository": {
     "type": "git",
-    "url": "https://github.com/numman-ali/cc-wrapped.git"
+    "url": "https://github.com/larkinwc/cc-wrapped.git"
   },
   "bugs": {
-    "url": "https://github.com/numman-ali/cc-wrapped/issues"
+    "url": "https://github.com/larkinwc/cc-wrapped/issues"
   },
   "keywords": [
     "claude",
@@ -33,7 +33,7 @@
     "start": "tsx src/index.ts",
     "dev": "tsx --watch src/index.ts",
     "build": "tsup",
-    "prepublishOnly": "npm run build",
+    "prepare": "npm run build",
     "release": "semantic-release",
     "clean": "rm -rf dist"
   },
