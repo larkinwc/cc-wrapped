@@ -31,13 +31,13 @@ Generate a personalized "Spotify Wrapped"-style summary of your [Claude Code](ht
 Run directly without installing:
 
 ```bash
-npx cc-wrapped # or bunx, or yarn/pnpm dlx
+npx github:larkinwc/cc-wrapped
 ```
 
 ### Global Install
 
 ```bash
-npm install -g cc-wrapped # or bun/yarn/pnpm
+npm install -g github:larkinwc/cc-wrapped
 ```
 
 Then run anywhere:
