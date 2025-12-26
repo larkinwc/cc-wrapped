@@ -48,11 +48,42 @@ cc-wrapped
 
 ## Usage Options
 
-| Option          | Description                          |
-| --------------- | ------------------------------------ |
-| `--year, -y`    | Generate wrapped for a specific year |
-| `--help, -h`    | Show help message                    |
-| `--version, -v` | Show version number                  |
+| Option            | Description                                                      |
+| ----------------- | ---------------------------------------------------------------- |
+| `--year, -y`      | Generate wrapped for a specific year                             |
+| `--export, -e`    | Export raw data to a portable JSON file                          |
+| `--input, -i`     | Generate wrapped from one or more exported files (comma-separated) |
+| `--help, -h`      | Show help message                                                |
+| `--version, -v`   | Show version number                                              |
+
+## Combining Data from Multiple Machines
+
+If you use Claude Code on multiple computers, you can combine your usage data to generate a unified wrapped.
+
+### Step 1: Export data from each machine
+
+On each computer, run:
+
+```bash
+cc-wrapped --export ~/work-pc.json
+cc-wrapped --export ~/home-laptop.json
+```
+
+This creates a portable JSON file containing all your usage data for that machine.
+
+### Step 2: Combine and generate
+
+Copy all exported files to one machine, then run:
+
+```bash
+cc-wrapped --input work-pc.json,home-laptop.json
+```
+
+The tool will:
+- Merge all usage data
+- Deduplicate entries automatically
+- Show which sources contributed to the stats
+- Generate a combined wrapped image
 
 ## Features
 
@@ -63,6 +94,7 @@ cc-wrapped
 - Shareable PNG image
 - Inline image display (Ghostty, Kitty, iTerm2, WezTerm, Konsole)
 - Auto-copy to clipboard
+- **Multi-machine support**: Export and combine data from multiple computers
 
 ## Terminal Support
 

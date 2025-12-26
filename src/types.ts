@@ -133,3 +133,27 @@ export interface CliArgs {
   year?: number;
   help?: boolean;
 }
+
+// Raw usage entry - the portable format for combining data across machines
+export interface RawUsageEntry {
+  timestamp: number;
+  sessionId?: string;
+  messageId?: string;
+  requestId?: string;
+  model?: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  costUSD?: number;
+}
+
+// Exported data file format
+export interface ExportedData {
+  version: 1;
+  exportedAt: string;
+  machineId: string;
+  year: number;
+  entries: RawUsageEntry[];
+  projects: string[];
+}

@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import os from "node:os";
 import { createInterface } from "node:readline";
 import { calculateCostUSD, getModelPricing, type ModelPricing } from "./pricing";
+import type { RawUsageEntry } from "./types";
 
 export interface ClaudeStatsCache {
   version?: number;
@@ -311,4 +312,68 @@ function formatDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+// Collect raw usage entries for export (portable format)
+export async function collectRawEntries(year: number): Promise<RawUsageEntry[]> {
+  const roots = await getClaudeProjectRoots();
+  const processedHashes = new Set<string>();
+  const entries: RawUsageEntry[] = [];
+
+  for (const root of roots) {
+    const exists = await pathIsDirectory(root);
+    if (!exists) continue;
+
+    const files = await listJsonlFiles(root);
+    for (const filePath of files) {
+      const rl = createInterface({
+        input: createReadStream(filePath),
+        crlfDelay: Infinity,
+      });
+
+      for await (const line of rl) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let entry: any;
+        try {
+          entry = JSON.parse(trimmed);
+        } catch {
+          continue;
+        }
+
+        const uniqueHash = createUniqueHash(entry);
+        if (uniqueHash && processedHashes.has(uniqueHash)) {
+          continue;
+        }
+        if (uniqueHash) {
+          processedHashes.add(uniqueHash);
+        }
+
+        const timestamp = entry?.timestamp;
+        if (!timestamp) continue;
+        const entryDate = new Date(timestamp);
+        if (Number.isNaN(entryDate.getTime()) || entryDate.getFullYear() !== year) {
+          continue;
+        }
+
+        const usage = entry?.message?.usage;
+        const model = typeof entry?.message?.model === "string" ? entry.message.model : undefined;
+
+        entries.push({
+          timestamp,
+          sessionId: typeof entry?.sessionId === "string" ? entry.sessionId : undefined,
+          messageId: typeof entry?.message?.id === "string" ? entry.message.id : undefined,
+          requestId: typeof entry?.requestId === "string" ? entry.requestId : undefined,
+          model,
+          inputTokens: usage ? ensureNumber(usage.input_tokens) : 0,
+          outputTokens: usage ? ensureNumber(usage.output_tokens) : 0,
+          cacheCreationTokens: usage ? ensureNumber(usage.cache_creation_input_tokens) : 0,
+          cacheReadTokens: usage ? ensureNumber(usage.cache_read_input_tokens) : 0,
+          costUSD: typeof entry?.costUSD === "number" ? entry.costUSD : undefined,
+        });
+      }
+    }
+  }
+
+  return entries;
 }

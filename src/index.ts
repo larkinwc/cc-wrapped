@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 
 import { checkClaudeDataExists } from "./collector";
-import { calculateStats } from "./stats";
+import { calculateStats, calculateStatsFromEntries } from "./stats";
+import { exportData, loadMultipleExports } from "./export";
 import { generateImage } from "./image/generator";
 import { displayInTerminal, getTerminalName } from "./terminal/display";
 import { copyImageToClipboard } from "./clipboard";
@@ -25,13 +26,17 @@ USAGE:
   cc-wrapped [OPTIONS]
 
 OPTIONS:
-  --year <YYYY>    Generate wrapped for a specific year (default: current year)
-  --help, -h       Show this help message
-  --version, -v    Show version number
+  --year <YYYY>      Generate wrapped for a specific year (default: current year)
+  --export <FILE>    Export raw data to a portable JSON file for combining across machines
+  --input <FILES>    Generate wrapped from one or more exported data files (comma-separated)
+  --help, -h         Show this help message
+  --version, -v      Show version number
 
 EXAMPLES:
-  cc-wrapped              # Generate current year wrapped
-  cc-wrapped --year 2025  # Generate 2025 wrapped
+  cc-wrapped                       # Generate current year wrapped
+  cc-wrapped --year 2025           # Generate 2025 wrapped
+  cc-wrapped --export data.json    # Export data to a file
+  cc-wrapped --input a.json,b.json # Combine data from multiple machines
 `);
 }
 
@@ -41,6 +46,8 @@ async function main() {
     args: process.argv.slice(2),
     options: {
       year: { type: "string", short: "y" },
+      export: { type: "string", short: "e" },
+      input: { type: "string", short: "i" },
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
     },
@@ -62,6 +69,57 @@ async function main() {
 
   const requestedYear = values.year ? parseInt(values.year, 10) : new Date().getFullYear();
 
+  // Handle export mode
+  if (values.export) {
+    const spinner = p.spinner();
+    spinner.start("Exporting Claude Code data...");
+
+    try {
+      const { entryCount, projectCount } = await exportData(requestedYear, values.export);
+      spinner.stop("Export complete!");
+      p.note(
+        `Entries: ${formatNumber(entryCount)}\nProjects: ${formatNumber(projectCount)}\nFile: ${values.export}`,
+        `Exported ${requestedYear} data`
+      );
+      p.outro("Share this file to combine with other machines!");
+    } catch (error) {
+      spinner.stop("Export failed");
+      p.cancel(`Error: ${error}`);
+      process.exit(1);
+    }
+    process.exit(0);
+  }
+
+  // Handle input mode (combining multiple exports)
+  if (values.input) {
+    const inputPaths = values.input.split(",").map((p) => p.trim()).filter((p) => p);
+    if (inputPaths.length === 0) {
+      p.cancel("No input files specified");
+      process.exit(1);
+    }
+
+    const spinner = p.spinner();
+    spinner.start(`Loading ${inputPaths.length} data file(s)...`);
+
+    let stats: ClaudeCodeStats;
+    try {
+      const { entries, projects, sources } = await loadMultipleExports(inputPaths);
+      spinner.message("Calculating combined stats...");
+      stats = await calculateStatsFromEntries(entries, projects, requestedYear);
+      spinner.stop("Combined stats ready!");
+      p.note(`Sources:\n${sources.map((s) => `  - ${s}`).join("\n")}`, "Data from");
+    } catch (error) {
+      spinner.stop("Failed to load data");
+      p.cancel(`Error: ${error}`);
+      process.exit(1);
+    }
+
+    // Continue with normal wrapped generation using combined stats
+    await generateWrapped(stats, requestedYear);
+    return;
+  }
+
+  // Normal mode - collect from local data
   const availability = isWrappedAvailable(requestedYear);
   if (!availability.available) {
     if (Array.isArray(availability.message)) {
@@ -115,6 +173,10 @@ async function main() {
     }
   }
 
+  await generateWrapped(stats, requestedYear);
+}
+
+async function generateWrapped(stats: ClaudeCodeStats, year: number): Promise<void> {
   // Display summary
   const summaryLines = [
     `Sessions:      ${formatNumber(stats.totalSessions)}`,
@@ -126,9 +188,10 @@ async function main() {
     stats.mostActiveDay && `Most Active:   ${stats.mostActiveDay.formattedDate}`,
   ].filter(Boolean);
 
-  p.note(summaryLines.join("\n"), `Your ${requestedYear} in Claude Code`);
+  p.note(summaryLines.join("\n"), `Your ${year} in Claude Code`);
 
   // Generate image
+  const spinner = p.spinner();
   spinner.start("Generating your wrapped image...");
 
   let image: { fullSize: Buffer; displaySize: Buffer };
@@ -147,7 +210,7 @@ async function main() {
     p.log.info(`Terminal (${getTerminalName()}) doesn't support inline images`);
   }
 
-  const filename = `cc-wrapped-${requestedYear}.png`;
+  const filename = `cc-wrapped-${year}.png`;
   const { success, error } = await copyImageToClipboard(image.fullSize, filename);
 
   if (success) {

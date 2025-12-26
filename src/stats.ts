@@ -1,6 +1,7 @@
-import type { ClaudeCodeStats, ModelStats, ProviderStats, WeekdayActivity } from "./types";
+import type { ClaudeCodeStats, ModelStats, ProviderStats, RawUsageEntry, WeekdayActivity } from "./types";
 import { collectClaudeProjects, collectClaudeUsageSummary, loadClaudeStatsCache } from "./collector";
 import { fetchModelsData, getModelDisplayName, getModelProvider, getProviderDisplayName } from "./models";
+import { calculateCostUSD, getModelPricing, type ModelPricing } from "./pricing";
 
 export async function calculateStats(year: number): Promise<ClaudeCodeStats> {
   const [, statsCache, projects, usageSummary] = await Promise.all([
@@ -371,5 +372,164 @@ function buildWeekdayActivity(counts: [number, number, number, number, number, n
     mostActiveDay,
     mostActiveDayName: WEEKDAY_NAMES_FULL[mostActiveDay],
     maxCount,
+  };
+}
+
+// Calculate stats from imported raw entries (for combining data from multiple machines)
+export async function calculateStatsFromEntries(
+  entries: RawUsageEntry[],
+  projects: Set<string>,
+  year: number
+): Promise<ClaudeCodeStats> {
+  await fetchModelsData();
+
+  const dailyActivity = new Map<string, number>();
+  const weekdayCounts: [number, number, number, number, number, number, number] = [0, 0, 0, 0, 0, 0, 0];
+  const modelTokenTotals = new Map<string, number>();
+  const sessionIds = new Set<string>();
+  const pricingCache = new Map<string, ModelPricing | null>();
+
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let totalCacheCreationTokens = 0;
+  let totalCacheReadTokens = 0;
+  let totalTokens = 0;
+  let totalCostUSD = 0;
+  let firstTimestamp: Date | null = null;
+  let totalMessages = 0;
+
+  for (const entry of entries) {
+    const entryDate = new Date(entry.timestamp);
+    if (Number.isNaN(entryDate.getTime()) || entryDate.getFullYear() !== year) {
+      continue;
+    }
+
+    if (firstTimestamp == null || entryDate < firstTimestamp) {
+      firstTimestamp = entryDate;
+    }
+
+    const dateKey = formatDateKey(entryDate);
+    dailyActivity.set(dateKey, (dailyActivity.get(dateKey) || 0) + 1);
+    totalMessages += 1;
+
+    const weekday = entryDate.getDay();
+    weekdayCounts[weekday] += 1;
+
+    if (entry.sessionId) {
+      sessionIds.add(entry.sessionId);
+    }
+
+    const input = entry.inputTokens;
+    const output = entry.outputTokens;
+    const cacheCreate = entry.cacheCreationTokens;
+    const cacheRead = entry.cacheReadTokens;
+    const entryTotal = input + output + cacheCreate + cacheRead;
+
+    totalInputTokens += input;
+    totalOutputTokens += output;
+    totalCacheCreationTokens += cacheCreate;
+    totalCacheReadTokens += cacheRead;
+    totalTokens += entryTotal;
+
+    if (entry.costUSD !== undefined) {
+      totalCostUSD += entry.costUSD;
+    } else if (entry.model && entryTotal > 0) {
+      // Calculate cost from pricing data
+      let pricing = pricingCache.get(entry.model);
+      if (!pricingCache.has(entry.model)) {
+        pricing = await getModelPricing(entry.model);
+        pricingCache.set(entry.model, pricing ?? null);
+      }
+
+      if (pricing) {
+        totalCostUSD += calculateCostUSD(
+          {
+            inputTokens: input,
+            outputTokens: output,
+            cacheCreationTokens: cacheCreate,
+            cachedInputTokens: cacheRead,
+          },
+          pricing
+        );
+      }
+    }
+
+    if (entry.model) {
+      modelTokenTotals.set(entry.model, (modelTokenTotals.get(entry.model) || 0) + entryTotal);
+    }
+  }
+
+  const modelStats: ModelStats[] = [];
+  const providerCounts = new Map<string, number>();
+
+  for (const [modelId, tokens] of modelTokenTotals.entries()) {
+    if (tokens <= 0) continue;
+
+    const providerId = resolveProviderId(modelId);
+    providerCounts.set(providerId, (providerCounts.get(providerId) || 0) + tokens);
+
+    modelStats.push({
+      id: modelId,
+      name: getModelDisplayName(modelId),
+      providerId,
+      count: tokens,
+      percentage: 0,
+    });
+  }
+
+  const topModels = modelStats
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3)
+    .map((model) => ({
+      ...model,
+      percentage: totalTokens > 0 ? (model.count / totalTokens) * 100 : 0,
+    }));
+
+  const topProviders: ProviderStats[] = Array.from(providerCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([id, count]) => ({
+      id,
+      name: getProviderDisplayName(id),
+      count,
+      percentage: totalTokens > 0 ? (count / totalTokens) * 100 : 0,
+    }));
+
+  const { maxStreak, currentStreak, maxStreakDays } = calculateStreaks(dailyActivity, year);
+  const mostActiveDay = findMostActiveDay(dailyActivity);
+  const weekdayActivity = buildWeekdayActivity(weekdayCounts);
+
+  const cacheDenominator = totalCacheReadTokens + totalCacheCreationTokens;
+  const cacheHitRate = cacheDenominator > 0 ? (totalCacheReadTokens / cacheDenominator) * 100 : 0;
+
+  const firstSessionDate = firstTimestamp ?? new Date();
+  const daysSinceFirstSession = Math.floor((Date.now() - firstSessionDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  return {
+    year,
+    firstSessionDate,
+    daysSinceFirstSession,
+    totalSessions: sessionIds.size,
+    totalMessages,
+    totalProjects: projects.size,
+    totalInputTokens,
+    totalOutputTokens,
+    totalTokens,
+    totalCacheReadTokens,
+    totalCacheWriteTokens: totalCacheCreationTokens,
+    cacheHitRate,
+    totalWebSearchRequests: 0,
+    totalToolCalls: 0,
+    peakContextWindow: 0,
+    totalCost: totalCostUSD,
+    hasUsageCost: totalCostUSD > 0,
+    topModels,
+    topProviders,
+    maxStreak,
+    currentStreak,
+    maxStreakDays,
+    dailyActivity,
+    mostActiveDay,
+    weekdayActivity,
   };
 }
