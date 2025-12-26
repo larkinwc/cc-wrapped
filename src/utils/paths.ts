@@ -58,10 +58,3 @@ export function getAssetsDir(): string {
 export function getFontsDir(): string {
   return join(getAssetsDir(), "fonts");
 }
-
-/**
- * Get the path to the node_modules directory
- */
-export function getNodeModulesDir(): string {
-  return join(getPackageRoot(), "node_modules");
-}

@@ -1,12 +1,13 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { createRequire } from "node:module";
 import satori from "satori";
 import { Resvg, initWasm } from "@resvg/resvg-wasm";
 import { WrappedTemplate } from "./template";
 import type { ClaudeCodeStats } from "../types";
 import { loadFonts } from "./fonts";
 import { layout } from "./design-tokens";
-import { getNodeModulesDir } from "../utils/paths";
+
+const require = createRequire(import.meta.url);
 
 export interface GeneratedImage {
   /** Full resolution PNG buffer for saving/clipboard */
@@ -16,7 +17,8 @@ export interface GeneratedImage {
 }
 
 export async function generateImage(stats: ClaudeCodeStats): Promise<GeneratedImage> {
-  const wasmPath = join(getNodeModulesDir(), "@resvg/resvg-wasm/index_bg.wasm");
+  // Use Node's module resolution to find the WASM file (works with hoisted deps)
+  const wasmPath = require.resolve("@resvg/resvg-wasm/index_bg.wasm");
   const wasmBuffer = await readFile(wasmPath);
   await initWasm(wasmBuffer);
 
