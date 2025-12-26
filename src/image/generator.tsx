@@ -1,10 +1,12 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import satori from "satori";
 import { Resvg, initWasm } from "@resvg/resvg-wasm";
-import resvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 import { WrappedTemplate } from "./template";
 import type { ClaudeCodeStats } from "../types";
 import { loadFonts } from "./fonts";
 import { layout } from "./design-tokens";
+import { getNodeModulesDir } from "../utils/paths";
 
 export interface GeneratedImage {
   /** Full resolution PNG buffer for saving/clipboard */
@@ -14,7 +16,9 @@ export interface GeneratedImage {
 }
 
 export async function generateImage(stats: ClaudeCodeStats): Promise<GeneratedImage> {
-  await initWasm(Bun.file(resvgWasm).arrayBuffer());
+  const wasmPath = join(getNodeModulesDir(), "@resvg/resvg-wasm/index_bg.wasm");
+  const wasmBuffer = await readFile(wasmPath);
+  await initWasm(wasmBuffer);
 
   const svg = await satori(<WrappedTemplate stats={stats} />, {
     width: layout.canvas.width,

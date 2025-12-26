@@ -16,7 +16,7 @@
 Generate a personalized "Spotify Wrapped"-style summary of your [Claude Code](https://claude.ai) usage.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Bun](https://img.shields.io/badge/Bun-%23000000.svg?logo=bun&logoColor=white)](https://bun.sh)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 
 <img src="./assets/images/demo-wrapped.png" alt="Claude Code Wrapped Example" width="600" />
 
@@ -28,16 +28,16 @@ Generate a personalized "Spotify Wrapped"-style summary of your [Claude Code](ht
 
 ### Quick Start
 
-Run directly without installing:
+Run directly without installing (requires Node.js 18+):
 
 ```bash
-npx github:larkinwc/cc-wrapped
+npx cc-wrapped
 ```
 
 ### Global Install
 
 ```bash
-npm install -g github:larkinwc/cc-wrapped
+npm install -g cc-wrapped
 ```
 
 Then run anywhere:
@@ -127,21 +127,34 @@ Claude Code Wrapped reads data from your local Claude Code installation:
 
 No data is sent anywhere. Everything is processed locally.
 
-## Building
+## Development
 
-### Development
+### Prerequisites
 
-```bash
-# Run in development mode with hot reload
-bun run dev
-```
+- Node.js 18+
+- npm
 
-### Production Build
+### Running locally
 
 ```bash
-# Build for all platforms
-bun run build
+# Install dependencies
+npm install
+
+# Run in development mode (uses tsx for TypeScript)
+npm run start
+
+# Run with file watching
+npm run dev
 ```
+
+### Building
+
+```bash
+# Build for distribution
+npm run build
+```
+
+This creates a bundled JavaScript file in `dist/` that runs on any system with Node.js 18+.
 
 ### Releasing
 
@@ -149,7 +162,8 @@ Releases are automated via [semantic-release](https://semantic-release.gitbook.i
 
 ## Tech Stack
 
-- **Runtime**: [Bun](https://bun.sh)
+- **Runtime**: [Node.js](https://nodejs.org) 18+
+- **Build**: [tsup](https://tsup.egoist.dev) (esbuild-based bundler)
 - **Image Generation**: [Satori](https://github.com/vercel/satori) + [Resvg](https://github.com/nicolo-ribaudo/resvg-js)
 - **CLI UI**: [@clack/prompts](https://github.com/natemoo-re/clack)
 - **Font**: IBM Plex Mono

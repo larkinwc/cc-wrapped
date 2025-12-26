@@ -1,6 +1,6 @@
 import { tmpdir } from "os";
 import { join } from "path";
-import { unlink } from "fs/promises";
+import { unlink, writeFile } from "fs/promises";
 import type { ClipboardResult, ClipboardProvider } from "./types";
 import { macOSProvider } from "./macos";
 import { linuxProvider } from "./linux";
@@ -47,7 +47,7 @@ export async function copyImageToClipboard(pngBuffer: Buffer, filename: string):
   const tempPath = join(tmpdir(), filename);
 
   try {
-    await Bun.write(tempPath, pngBuffer);
+    await writeFile(tempPath, pngBuffer);
     return await provider.copyImage(tempPath);
   } finally {
     // Clean up temp file

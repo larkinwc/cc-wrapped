@@ -23,13 +23,17 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "cc-wrapped": "./bin/cc-wrapped"
+    "cc-wrapped": "./dist/index.js"
   },
+  "files": [
+    "dist",
+    "assets"
+  ],
   "scripts": {
-    "start": "bun src/index.ts",
-    "dev": "bun run --watch src/index.ts",
-    "build": "tsgo --noEmit && bun run scripts/build.ts",
-    "publish": "bun run scripts/publish.ts",
+    "start": "tsx src/index.ts",
+    "dev": "tsx --watch src/index.ts",
+    "build": "tsup",
+    "prepublishOnly": "npm run build",
     "release": "semantic-release",
     "clean": "rm -rf dist"
   },
@@ -43,11 +47,14 @@
   "devDependencies": {
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",
-    "@types/bun": "latest",
+    "@types/node": "^22.0.0",
     "@types/react": "^19.2.7",
-    "@typescript/native-preview": "^7.0.0-dev.20251223.1",
-    "bunup": "^0.16.10",
     "semantic-release": "^25.0.2",
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
     "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

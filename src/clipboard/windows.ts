@@ -1,5 +1,6 @@
 import type { ClipboardProvider, ClipboardResult } from "./types";
 import { DEFAULT_TIMEOUT_MS } from "./types";
+import { spawnAsync } from "../utils/spawn";
 
 const isWSL = !!process.env.WSL_DISTRO_NAME;
 
@@ -8,17 +9,16 @@ const isWSL = !!process.env.WSL_DISTRO_NAME;
  * e.g., /tmp/image.png -> \\wsl$\Ubuntu\tmp\image.png
  */
 async function toWindowsPath(wslPath: string): Promise<string> {
-  const proc = Bun.spawn(["wslpath", "-w", wslPath], {
+  const result = await spawnAsync("wslpath", ["-w", wslPath], {
     stdout: "pipe",
     stderr: "pipe",
   });
 
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
+  if (result.exitCode !== 0) {
     throw new Error("Failed to convert WSL path to Windows path");
   }
 
-  return (await new Response(proc.stdout).text()).trim();
+  return result.stdout.trim();
 }
 
 export const windowsProvider: ClipboardProvider = {
@@ -51,24 +51,23 @@ try {
 }
 `.trim();
 
-      const proc = Bun.spawn(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script], {
-        stdout: "pipe",
-        stderr: "pipe",
-      });
+      const result = await Promise.race([
+        spawnAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+          stdout: "pipe",
+          stderr: "pipe",
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout")), DEFAULT_TIMEOUT_MS)
+        ),
+      ]);
 
-      const timeoutId = setTimeout(() => proc.kill(), DEFAULT_TIMEOUT_MS);
-
-      const exitCode = await proc.exited;
-      clearTimeout(timeoutId);
-
-      if (exitCode === 0) {
+      if (result.exitCode === 0) {
         return { success: true };
       }
 
-      const stderr = await new Response(proc.stderr).text();
       return {
         success: false,
-        error: stderr.trim() || `PowerShell exited with code ${exitCode}`,
+        error: result.stderr.trim() || `PowerShell exited with code ${result.exitCode}`,
       };
     } catch (error) {
       return {

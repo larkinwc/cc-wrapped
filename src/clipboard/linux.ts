@@ -1,5 +1,7 @@
 import type { ClipboardProvider, ClipboardResult } from "./types";
 import { DEFAULT_TIMEOUT_MS } from "./types";
+import { which } from "../utils/which";
+import { spawnAsync, createFileStream } from "../utils/spawn";
 
 type LinuxTool = {
   cmd: string;
@@ -37,7 +39,7 @@ async function cmdExists(cmd: string): Promise<boolean> {
   if (whichCache.has(cmd)) {
     return whichCache.get(cmd)!;
   }
-  const exists = (await Bun.which(cmd)) !== null;
+  const exists = (await which(cmd)) !== null;
   whichCache.set(cmd, exists);
   return exists;
 }
@@ -45,35 +47,27 @@ async function cmdExists(cmd: string): Promise<boolean> {
 async function tryTool(tool: LinuxTool, imagePath: string): Promise<ClipboardResult> {
   const args = tool.args(imagePath);
 
-  const proc = tool.usesStdin
-    ? Bun.spawn([tool.cmd, ...args], {
-        stdin: Bun.file(imagePath),
-        stdout: "pipe",
-        stderr: "pipe",
-      })
-    : Bun.spawn([tool.cmd, ...args], {
-        stdin: "ignore",
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-
-  const timeoutId = setTimeout(() => proc.kill(), DEFAULT_TIMEOUT_MS);
-
   try {
-    const exitCode = await proc.exited;
-    clearTimeout(timeoutId);
+    const result = await Promise.race([
+      spawnAsync(tool.cmd, args, {
+        stdin: tool.usesStdin ? createFileStream(imagePath) : null,
+        stdout: "pipe",
+        stderr: "pipe",
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), DEFAULT_TIMEOUT_MS)
+      ),
+    ]);
 
-    if (exitCode === 0) {
+    if (result.exitCode === 0) {
       return { success: true };
     }
 
-    const stderr = await new Response(proc.stderr).text();
     return {
       success: false,
-      error: stderr.trim() || `${tool.cmd} exited with code ${exitCode}`,
+      error: result.stderr.trim() || `${tool.cmd} exited with code ${result.exitCode}`,
     };
   } catch (error) {
-    clearTimeout(timeoutId);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",

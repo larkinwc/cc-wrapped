@@ -1,8 +1,10 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 import * as p from "@clack/prompts";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import { spawnAsync } from "./utils/spawn";
 
 import { checkClaudeDataExists } from "./collector";
 import { calculateStats, calculateStatsFromEntries } from "./stats";
@@ -234,7 +236,7 @@ async function generateWrapped(stats: ClaudeCodeStats, year: number): Promise<vo
 
   if (shouldSave) {
     try {
-      await Bun.write(defaultPath, image.fullSize);
+      await writeFile(defaultPath, image.fullSize);
       p.log.success(`Saved to ${defaultPath}`);
     } catch (error) {
       p.log.error(`Failed to save: ${error}`);
@@ -302,12 +304,11 @@ async function openUrl(url: string): Promise<boolean> {
   }
 
   try {
-    const proc = Bun.spawn([command, url], {
+    const result = await spawnAsync(command, [url], {
       stdout: "ignore",
       stderr: "ignore",
     });
-    await proc.exited;
-    return proc.exitCode === 0;
+    return result.exitCode === 0;
   } catch {
     return false;
   }
