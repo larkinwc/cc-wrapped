@@ -4,15 +4,6 @@
 
 **Your year in code, beautifully visualized.**
 
-<p>
-  <strong>Credit:</strong> Built on top of
-  <a href="https://github.com/moddi3/opencode-wrapped">opencode-wrapped</a>
-  by moddi3 (<a href="https://x.com/moddi3io">@moddi3io</a>).
-</p>
-<p>
-  Found this useful? Follow <a href="https://x.com/nummanali">@nummanali</a> for more AI tooling!
-</p>
-
 Generate a personalized "Spotify Wrapped"-style summary of your [Claude Code](https://claude.ai) usage.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -31,13 +22,13 @@ Generate a personalized "Spotify Wrapped"-style summary of your [Claude Code](ht
 Run directly without installing (requires Node.js 18+):
 
 ```bash
-npx cc-wrapped
+npx github:larkinwc/cc-wrapped
 ```
 
 ### Global Install
 
 ```bash
-npm install -g cc-wrapped
+npm install -g github:larkinwc/cc-wrapped
 ```
 
 Then run anywhere:
@@ -181,7 +172,5 @@ MIT License - see [LICENSE](LICENSE) for details.
 <div align="center">
 
 Built for the Claude Code community
-
-Credit: <a href="https://github.com/ryoppippi/ccusage">ccusage</a>
 
 </div>
