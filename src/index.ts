@@ -99,6 +99,22 @@ async function main() {
 
   spinner.stop("Found your stats!");
 
+  const activityDates = Array.from(stats.dailyActivity.keys())
+    .map((d) => new Date(d))
+    .filter((d) => !Number.isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+  if (activityDates.length > 1 && requestedYear === new Date().getFullYear()) {
+    const spanDays = Math.ceil(
+      (activityDates[activityDates.length - 1].getTime() - activityDates[0].getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+    if (spanDays <= 35) {
+      p.log.warn(
+        "Claude Code logs are kept ~30 days by default. To keep more history, increase cleanupPeriodDays in your settings.json."
+      );
+    }
+  }
+
   // Display summary
   const summaryLines = [
     `Sessions:      ${formatNumber(stats.totalSessions)}`,
